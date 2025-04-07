@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Building Map</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        .map-container {
+            position: relative;
+            border: 2px solid #333;
+            margin: 10px 0;
+            background-color: #fff;
+            height: 600px;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-x pan-y;
+        }
+        .map-content {
+            position: relative;
+            width: 950px;
+            height: 1060px;
+        }
+        .room {
+            position: absolute;
+            background-color: rgba(200, 200, 200, 0.5);
+            border: 1px solid #333;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .room:hover {
+            background-color: rgba(100, 150, 255, 0.7);
+        }
+        .room.highlight {
+            background-color: rgba(255, 215, 0, 0.7);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+        .corridor {
+            position: absolute;
+            background-color: rgba(230, 230, 230, 0.7);
+            border: 1px dashed #999;
+        }
+        .entrance {
+            position: absolute;
+            background-color: rgba(100, 200, 100, 0.7);
+            border: 2px solid #060;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .water {
+            position: absolute;
+            background-color: rgba(100, 180, 255, 0.7);
+            border: 1px solid #009;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+        }
+        .road {
+            position: absolute;
+            background-color: rgba(100, 100, 100, 0.3);
+            border: 1px solid #555;
+        }
+        .instructions {
+            background-color: #e9f7ef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .destination-selector {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+        }
+        .legend {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            flex: 0 0 calc(50% - 10px);
+        }
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        select {
+            padding: 8px;
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+        .you-are-here {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+            touch-action: none;
+        }
+        .you-are-here.active {
+            display: block;
+        }
+        /* L-shaped room with no inner border */
+        .l-shaped-room {
+            position: absolute;
+            background-color: rgba(200, 200, 200, 0.5);
+            border: 1px solid #333;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .l-shaped-room:hover {
+            background-color: rgba(100, 150, 255, 0.7);
+        }
+        .l-shaped-room.highlight {
+            background-color: rgba(255, 215, 0, 0.7);
+            animation: pulse 2s infinite;
+        }
+        
+        /* Remove the inner border between Room 1 parts */
+        #room1 {
+            border-bottom: none;
+        }
+        #room1-extension {
+            border-top: none;
+        }
+        
+        /* Responsive styles */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 20px;
+            }
+            .legend-item {
+                flex: 0 0 100%;
+            }
+            .instructions h3 {
+                font-size: 16px;
+                margin-top: 5px;
+                margin-bottom: 5px;
+            }
+            .instructions p {
+                font-size: 14px;
+                margin-top: 5px;
+            }
+        }
+        
+        /* Zoom controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+        }
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+            font-size: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Office Building Interactive Map</h1>
+        
+        <div class="instructions">
+            <h3>Welcome to our office!</h3>
+            <p>Use this interactive map to navigate through our building. Select your destination from the dropdown below.</p>
+        </div>
+        
+        <div class="destination-selector">
+            <label for="destination">I'm looking for: </label>
+            <select id="destination" onchange="highlightDestination()">
+                <option value="">Select a location</option>
+                <option value="room1">Room 1</option>
+                <option value="room2">Room 2</option>
+                <option value="room3">Room 3</option>
+                <option value="room4">Room 4</option>
+                <option value="room5">Room 5</option>
+                <option value="room6">Room 6</option>
+                <option value="room7">Room 7</option>
+                <option value="room8">Room 8</option>
+                <option value="room9">Room 9</option>
+                <option value="room10">Room 10</option>
+                <option value="room11">Room 11</option>
+                <option value="room12">Room 12</option>
+                <option value="room13">Room 13</option>
+                <option value="room14">Room 14</option>
+                <option value="room15">Room 15</option>
+                <option value="room16">Room 16</option>
+                <option value="room17">Room 17</option>
+                <option value="room18">Room 18</option>
+                <option value="room19">Room 19</option>
+                <option value="room20">Room 20</option>
+                <option value="room21">Room 21</option>
+                <option value="room22">Room 22</option>
+                <option value="room23">Room 23</option>
+                <option value="entrance">Entrance</option>
+                <option value="water">Drinking Water</option>
+            </select>
+            <button onclick="setYouAreHere()">Set 'You Are Here'</button>
+        </div>
+        
+        <div class="map-container" id="mapContainer">
+            <div class="map-content" id="mapContent">
+                <!-- Road at the top, moved down 80px -->
+                <div class="road" style="top: 20px; left: 50px; width: 800px; height: 40px;">Road</div>
+                
+                <!-- Main corridors, moved down 80px -->
+                <div class="corridor" style="top: 180px; left: 50px; width: 900px; height: 40px;"></div>
+                <div class="corridor" style="top: 330px; left: 490px; width: 160px; height: 40px;"></div>
+                <div class="corridor" style="top: 580px; left: 50px; width: 75px; height: 40px;"></div>
+                            
+                <!-- Vertical corridors, moved down 80px -->
+                <div class="corridor" style="top: 180px; left: 450px; width: 40px; height: 600px;"></div>
+                <div class="corridor" style="top: 180px; left: 650px; width: 40px; height: 190px;"></div>
+                <div class="corridor" style="top: 220px; left: 125px; width: 40px; height: 820px;"></div>
+                
+                <!-- Entrance, moved down 80px -->
+                <div class="entrance" id="entrance" style="top: 60px; left: 285px; width: 150px; height: 120px;">ENTRANCE</div>
+                
+                <!-- Rooms, moved down 80px -->
+                <!-- Room 1 as a single L-shaped unit -->
+                <div id="room1" class="room" style="top: 220px; left: 690px; width: 160px; height: 150px; border-bottom: none; display: flex; align-items: center; justify-content: center;">Room 1</div>
+                <div class="l-shaped-room" id="room1-extension" style="top: 370px; left: 650px; width: 200px; height: 100px; border-top: none; border-left: none;"></div>
+                
+                <div class="room" id="room2" style="top: 120px; left: 700px; width: 87.5px; height: 60px;">Room 2</div>
+                <div class="room" id="room3" style="top: 120px; left: 615px; width: 87.5px; height: 60px;">Room 3</div>
+                <div class="room" id="room4" style="top: 120px; left: 440px; width: 175px; height: 60px;">Room 4</div>
+                <div class="room" id="room5" style="top: 220px; left: 550px; width: 100px; height: 110px;">Room 5</div>
+                <div class="room" id="room6" style="top: 370px; left: 490px; width: 160px; height: 100px;">Room 6</div>
+                <div class="room" id="room7" style="top: 220px; left: 490px; width: 60px; height: 110px;">Room 7</div>
+
+                <div class="room" id="room8" style="top: 220px; left: 165px; width: 285px; height: 110px;">Room 8</div>
+                <div class="room" id="room9" style="top: 330px; left: 165px; width: 285px; height: 70px;">Room 9</div>
+                <div class="room" id="room10" style="top: 400px; left: 290px; width: 160px; height: 80px;">Room 10</div>
+                <div class="room" id="room11" style="top: 480px; left: 350px; width: 100px; height: 50px;">Room 11</div>
+                <div class="room" id="room12" style="top: 530px; left: 350px; width: 100px; height: 50px;">Room 12</div>
+                <div class="room" id="room13" style="top: 580px; left: 165px; width: 285px; height: 100px;">Room 13</div>
+                <div class="room" id="room14" style="top: 680px; left: 165px; width: 285px; height: 100px;">Room 14</div>
+                <div class="room" id="room15" style="top: 780px; left: 165px; width: 325px; height: 100px;">Room 15</div>
+
+                <div class="room" id="room16" style="top: 220px; left: 50px; width: 75px; height: 75px;">Room 16</div>
+                <div class="room" id="room17" style="top: 295px; left: 50px; width: 75px; height: 75px;">Room 17</div>
+                <div class="room" id="room18" style="top: 220px; left: 20px; width: 30px; height: 75px;">Room 18</div>
+                <div class="room" id="room19" style="top: 220px; left: 900px; width: 50px; height: 110px;">Room 19</div>
+                <div class="room" id="room20" style="top: 400px; left: 165px; width: 125px; height: 80px;">Room 20</div>
+                <div class="room" id="room21" style="top: 620px; left: 20px; width: 105px; height: 50px;">Room 21</div>
+                <div class="room" id="room22" style="top: 880px; left: 165px; width: 285px; height: 80px;">Room 22</div>
+                <div class="room" id="room23" style="top: 960px; left: 165px; width: 285px; height: 80px;">Room 23</div>
+                
+                <!-- Water cooler, moved down 80px -->
+                <div class="water" id="water" style="top: 600px; left: 470px; width: 30px; height: 30px;">Water</div>
+                
+                <!-- You are here marker -->
+                <div class="you-are-here" id="youAreHere"></div>
+            </div>
+            
+            <!-- Zoom controls -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomIn()">+</button>
+                <button class="zoom-btn" onclick="zoomOut()">-</button>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: rgba(200, 200, 200, 0.5);"></div>
+                <span>Rooms</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: rgba(230, 230, 230, 0.7);"></div>
+                <span>Corridors</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: rgba(100, 200, 100, 0.7);"></div>
+                <span>Entrance</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: rgba(100, 180, 255, 0.7);"></div>
+                <span>Water</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: rgba(255, 215, 0, 0.7);"></div>
+                <span>Selected Location</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: red; border-radius: 50%;"></div>
+                <span>You Are Here</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Current scale of the map
+        let currentScale = 1;
+        const mapContent = document.getElementById('mapContent');
+        
+        // Function to highlight the selected destination
+        function highlightDestination() {
+            // Clear previous highlights
+            document.querySelectorAll('.room, .water, .entrance, .l-shaped-room').forEach(element => {
+                element.classList.remove('highlight');
+            });
+            
+            // Get the selected destination
+            const destination = document.getElementById('destination').value;
+            if (destination) {
+                // Special case for room1 which is now made of two parts
+                if (destination === 'room1') {
+                    document.getElementById('room1').classList.add('highlight');
+                    document.getElementById('room1-extension').classList.add('highlight');
+                    
+                    // Scroll to the room
+                    scrollToElement('room1');
+                } else {
+                    const destElement = document.getElementById(destination);
+                    
+                    // If destination exists, highlight it
+                    if (destElement) {
+                        destElement.classList.add('highlight');
+                        
+                        // Scroll to the element
+                        scrollToElement(destination);
+                    }
+                }
+            }
+        }
+        
+        // Function to scroll to an element
+        function scrollToElement(elementId) {
+            const element = document.getElementById(elementId);
+            const mapContainer = document.getElementById('mapContainer');
+            
+            if (element && mapContainer) {
+                const elementRect = element.getBoundingClientRect();
+                const containerRect = mapContainer.getBoundingClientRect();
+                
+                const scrollLeft = element.offsetLeft - (mapContainer.clientWidth / 2) + (element.offsetWidth / 2);
+                const scrollTop = element.offsetTop - (mapContainer.clientHeight / 2) + (element.offsetHeight / 2);
+                
+                mapContainer.scrollTo({
+                    left: scrollLeft,
+                    top: scrollTop,
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
+        // Add click event to rooms to show details
+        document.querySelectorAll('.room, .water, .entrance').forEach(element => {
+            element.addEventListener('click', function() {
+                let roomName = this.textContent.trim();
+                if (this.id === 'room1-extension') {
+                    roomName = 'Room 1';
+                }
+                alert('You selected: ' + roomName);
+                
+                // Special case for room1 extension
+                if (this.id === 'room1-extension') {
+                    const dropdown = document.getElementById('destination');
+                    dropdown.value = 'room1';
+                } else {
+                    // Set this room as the selected option in the dropdown
+                    const elementId = this.id;
+                    const dropdown = document.getElementById('destination');
+                    dropdown.value = elementId;
+                }
+                
+                // Highlight this room
+                highlightDestination();
+            });
+        });
+        
+        // Add click event to Room 1 extension
+        document.getElementById('room1-extension').addEventListener('click', function() {
+            alert('You selected: Room 1');
+            
+            // Set Room 1 as the selected option in the dropdown
+            const dropdown = document.getElementById('destination');
+            dropdown.value = 'room1';
+            
+            // Highlight Room 1
+            highlightDestination();
+        });
+        
+        // Function to set the "You Are Here" marker
+        function setYouAreHere() {
+            const youAreHere = document.getElementById('youAreHere');
+            youAreHere.classList.add('active');
+            
+            // Position the marker at the entrance initially
+            youAreHere.style.top = '120px';
+            youAreHere.style.left = '360px';
+            
+            // Scroll to the marker
+            scrollToPosition(360, 120);
+            
+            // Make the marker draggable for both mouse and touch events
+            initDraggable(youAreHere);
+        }
+        
+        // Function to initialize draggable functionality
+        function initDraggable(element) {
+            let isDragging = false;
+            let currentX;
+            let currentY;
+            let initialX;
+            let initialY;
+            let xOffset = 0;
+            let yOffset = 0;
+            
+            // Mouse Events
+            element.addEventListener('mousedown', dragStart);
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('mousemove', drag);
+            
+            // Touch Events
+            element.addEventListener('touchstart', dragStart, { passive: false });
+            document.addEventListener('touchend', dragEnd, { passive: false });
+            document.addEventListener('touchmove', drag, { passive: false });
+            
+            function dragStart(e) {
+                e.preventDefault();
+                
+                if (e.type === "touchstart") {
+                    initialX = e.touches[0].clientX - xOffset;
+                    initialY = e.touches[0].clientY - yOffset;
+                } else {
+                    initialX = e.clientX - xOffset;
+                    initialY = e.clientY - yOffset;
+                }
+                
+                isDragging = true;
+            }
+            
+            function dragEnd(e) {
+                initialX = currentX;
+                initialY = currentY;
+                
+                isDragging = false;
+            }
+            
+            function drag(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    
+                    if (e.type === "touchmove") {
+                        currentX = e.touches[0].clientX - initialX;
+                        currentY = e.touches[0].clientY - initialY;
+                    } else {
+                        currentX = e.clientX - initialX;
+                        currentY = e.clientY - initialY;
+                    }
+                    
+                    xOffset = currentX;
+                    yOffset = currentY;
+                    
+                    // Get the position relative to the map container
+                    const mapContainer = document.getElementById('mapContainer');
+                    const rect = mapContainer.getBoundingClientRect();
+                    const scrollLeft = mapContainer.scrollLeft;
+                    const scrollTop = mapContainer.scrollTop;
+                    
+                    let posX, posY;
+                    
+                    if (e.type === "touchmove") {
+                        posX = e.touches[0].clientX - rect.left + scrollLeft;
+                        posY = e.touches[0].clientY - rect.top + scrollTop;
+                    } else {
+                        posX = e.clientX - rect.left + scrollLeft;
+                        posY = e.clientY - rect.top + scrollTop;
+                    }
+                    
+                    // Update the position
+                    element.style.left = posX + 'px';
+                    element.style.top = posY + 'px';
+                }
+            }
+        }
+        
+        // Function to scroll to a specific position
+        function scrollToPosition(x, y) {
+            const mapContainer = document.getElementById('mapContainer');
+            mapContainer.scrollTo({
+                left: x - (mapContainer.clientWidth / 2),
+                top: y - (mapContainer.clientHeight / 2),
+                behavior: 'smooth'
+            });
+        }
+        
+        // Function to zoom in
+        function zoomIn() {
+            if (currentScale < 2) {
+                currentScale += 0.1;
+                applyZoom();
+            }
+        }
+        
+        // Function to zoom out
+        function zoomOut() {
+            if (currentScale > 0.5) {
+                currentScale -= 0.1;
+                applyZoom();
+            }
+        }
+        
+        // Apply zoom level
+        function applyZoom() {
+            mapContent.style.transform = `scale(${currentScale})`;
+            mapContent.style.transformOrigin = 'top left';
+        }
+    </script>
+</body>
+</html>
